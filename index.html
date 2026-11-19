@@ -40,6 +40,8 @@
   .global-btn{border:1px solid #dbe3ed;border-radius:9px;padding:7px 13px;background:#fff;color:#334155;font:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;min-height:36px}
   .global-btn:hover{background:#eff4ff;border-color:#c7d8f8}
   .global-btn:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
+  .audio-status{max-width:1100px;margin:0 auto;padding:0 8px 7px;color:#9a3412;font-size:13px}
+  .audio-status:empty{display:none}
   .global-btn[aria-pressed="true"]{border-color:#bfdbfe;background:#eaf2ff;color:#1d4ed8}
   /* Global visibility is a visual overlay, not a write to each word's mask. */
   body.hide-all-en .word.en,body.hide-all-zh .word.zh{color:transparent!important;background:var(--mask);user-select:none;-webkit-user-select:none}
@@ -56,6 +58,7 @@
   <button type="button" class="global-btn" id="toggle-all-en" aria-pressed="false">隐藏英文</button>
   <button type="button" class="global-btn" id="toggle-all-zh" aria-pressed="false">隐藏中文</button>
  </div>
+ <p class="audio-status" id="audio-status" role="status"></p>
 </header>
 <main class="wrap"><div id="sheet" class="sheet"></div></main>
 <script>
@@ -95,6 +98,11 @@ let playState='stopped';
 let ticket=0;
 let renderedActiveIndex=-1,renderedLoopIndex=-1;
 const synth=('speechSynthesis' in window)?window.speechSynthesis:null;
+const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+ || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+const useRecordings=isMobile||!synth;
+const audioStatus=document.getElementById('audio-status');
+let recording=null;
 let selectedVoice=null;
 const icons={
   play:'<polygon points="7 4 20 12 7 20 7 4"/>',
@@ -132,7 +140,7 @@ function getVoice(){
  return enUS[0]||null;
 }
 function refreshVoice(){selectedVoice=getVoice()}
-if(synth){refreshVoice();if('onvoiceschanged' in synth)synth.addEventListener('voiceschanged',refreshVoice)}
+if(!useRecordings){refreshVoice();if('onvoiceschanged' in synth)synth.addEventListener('voiceschanged',refreshVoice)}
 function refresh(){
  const affected = new Set([renderedActiveIndex,renderedLoopIndex,activeIndex,loopIndex]);
  for(const i of affected){
@@ -148,10 +156,45 @@ function refresh(){
  }
  renderedActiveIndex=activeIndex;renderedLoopIndex=loopIndex;
 }
-function stop(){ticket++;if(synth){synth.cancel()}activeIndex=-1;playState='stopped';refresh()}
+function stop(){
+ ticket++;
+ if(recording)recording.pause();
+ if(!useRecordings)synth.cancel();
+ activeIndex=-1;playState='stopped';refresh();
+}
+function recordingFailed(i,token){
+ if(token!==ticket||i!==activeIndex)return;
+ if(loopIndex===i)loopIndex=-1;
+ stop();
+ audioStatus.textContent='发音加载失败，请检查网络后再点一次播放。';
+}
+function playRecording(i){
+ if(!recording){
+  recording=new Audio();
+  recording.preload='none';
+  recording.addEventListener('ended',()=>{
+   if(recording.ended&&playState==='playing')stop();
+  });
+ }
+ const switching=activeIndex!==i;
+ const token=++ticket;
+ activeIndex=i;playState='playing';
+ audioStatus.textContent='';
+ recording.loop=loopIndex===i;
+ if(switching)recording.src='./audio/'+i+'.mp3';
+ recording.onerror=()=>{
+  if(recording.error)recordingFailed(i,token);
+ };
+ refresh();
+ // Keep play() in the tap handler so Safari can grant media playback.
+ recording.play().catch(()=>recordingFailed(i,token));
+}
+function playWord(i){
+ if(useRecordings)playRecording(i);
+ else speak(i);
+}
 function spokenText(text){return text.replace(/\//g,', ').replace(/\(([^)]*)\)/g,'$1')}
 function speak(i){
- if(!synth){window.alert('当前浏览器不支持语音播放。请使用 Chrome 或 Safari。');return}
  ticket++;const token=ticket;
  if(synth.speaking||synth.pending||synth.paused)synth.cancel();
  if(synth.paused)synth.resume();
@@ -178,25 +221,35 @@ function resumeWord(i){
  refresh();
 }
 function togglePlay(i){
- if(!synth){window.alert('当前浏览器不支持语音播放。');return}
  if(i===activeIndex){
   if(playState==='playing'){
-   if(synth.speaking||synth.pending)synth.pause();
+   if(useRecordings){ticket++;recording.pause()}
+   else if(synth.speaking||synth.pending)synth.pause();
    playState='paused';refresh();return;
   }
   if(playState==='paused'){
-   resumeWord(i);return;
+   if(useRecordings)playRecording(i);
+   else resumeWord(i);
+   return;
   }
  }
  if(loopIndex!==i)loopIndex=-1;
- speak(i);
+ playWord(i);
 }
 function toggleLoop(i){
- if(!synth){window.alert('当前浏览器不支持语音播放。');return}
- if(loopIndex===i){loopIndex=-1;refresh();return}
+ if(loopIndex===i){
+  loopIndex=-1;
+  if(recording)recording.loop=false;
+  refresh();return;
+ }
  loopIndex=i;
- if(activeIndex!==i||playState==='stopped'){speak(i);return}
- if(playState==='paused'){resumeWord(i);return}
+ if(activeIndex!==i||playState==='stopped'){playWord(i);return}
+ if(playState==='paused'){
+  if(useRecordings)playRecording(i);
+  else resumeWord(i);
+  return;
+ }
+ if(recording)recording.loop=true;
  refresh();
 }
 sheet.addEventListener('click',e=>{
