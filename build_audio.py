@@ -3,6 +3,7 @@
 import argparse
 from array import array
 from concurrent.futures import ThreadPoolExecutor
+from hashlib import sha256
 import json
 from pathlib import Path
 import re
@@ -83,6 +84,8 @@ def encode(file, output, bounds):
         audio.setpos(first)
         frames = audio.readframes(last - first)
     levels = array("h", frames)
+    if len(levels) != last - first:
+        raise ValueError(f"Incomplete PCM audio for {file.name}")
     peak = max(max(levels), -min(levels))
     if peak < 100:
         raise ValueError(f"Silent recording for {file.name}")
@@ -103,7 +106,6 @@ def encode(file, output, bounds):
 def build(source, out, corpus, rows):
     audio = out / "us-audio"
     audio.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(source / "index.html", out / "index.html")
     shutil.copyfile(source / "pronunciation-sources.html", out / "pronunciation-sources.html")
     shutil.copyfile(corpus / "LICENSE", out / "ku-artlex-license.txt")
     public = []
@@ -118,10 +120,12 @@ def build(source, out, corpus, rows):
 
     with ThreadPoolExecutor(max_workers=6) as pool:
         public.extend(pool.map(render, enumerate(rows)))
-    (out / "pronunciations.js").write_text(
-        "const DICTIONARY_LINKS = " + json.dumps(public, separators=(",", ":")) + ";\n",
-        encoding="utf-8",
-    )
+    script = "const DICTIONARY_LINKS = " + json.dumps(public, separators=(",", ":")) + ";\n"
+    (out / "pronunciations.js").write_text(script, encoding="utf-8")
+    revision = sha256(script.encode("utf-8")).hexdigest()[:12]
+    index = (source / "index.html").read_text(encoding="utf-8")
+    index = index.replace('src="./pronunciations.js"', f'src="./pronunciations.js?v={revision}"')
+    (out / "index.html").write_text(index, encoding="utf-8")
     count = public.count(None)
     print(f"Built {count} US-English studio recordings and {len(public) - count} dictionary links.")
 
