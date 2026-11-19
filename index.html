@@ -104,7 +104,7 @@ let playState='stopped';
 let ticket=0;
 let renderedActiveIndex=-1,renderedLoopIndex=-1;
 const dictionaryLinks=typeof DICTIONARY_LINKS==='undefined'?[]:DICTIONARY_LINKS;
-const dictionarySearch=(word)=>'https://dictionary.cambridge.org/us/search/english/?q='+encodeURIComponent(word);
+const dictionarySearch=(word)=>'https://www.youdao.com/result?word='+encodeURIComponent(word)+'&lang=en';
 const audioStatus=document.getElementById('audio-status');
 let recording=null;
 const icons={
@@ -127,11 +127,11 @@ sheet.innerHTML=ITEMS.map((item,i)=>{
  const playable=reference===null;
  const play=playable
   ? '<button class="icon-btn audio" data-act="play" aria-label="播放 '+label+' 的美式发音" aria-pressed="false" title="美式发音（真人录音）">'+svg('play')+'</button>'
-  : '<a class="icon-btn" href="'+escapeHTML(reference)+'" target="_blank" rel="noopener" aria-label="在剑桥词典查听 '+label+' 的美式发音" title="在剑桥词典查听美式发音">'+svg('external')+'</a>';
+  : '<a class="icon-btn" href="'+escapeHTML(reference)+'" target="_blank" rel="noopener" aria-label="在有道词典查听 '+label+' 的美式发音" title="在有道词典查听美式发音">'+svg('external')+'</a>';
  return '<section class="line" data-i="'+i+'">'
   +'<div class="tools">'+play
   +'<button class="icon-btn repeat" data-act="loop" aria-label="循环 '+label+'" aria-pressed="false"'
-  +(playable?' title="循环播放"':' disabled title="剑桥词典词条请在词典内播放"')+'>'+svg('loop')+'</button>'
+  +(playable?' title="循环播放"':' disabled title="有道词典词条请在词典内播放"')+'>'+svg('loop')+'</button>'
   +'</div>'
   +'<button class="word en'+(em?' masked':'')+'" data-act="en" aria-label="切换英文遮挡" aria-pressed="'+em+'">'+escapeHTML(item.en)+'</button>'
   +'<button class="word zh'+(zm?' masked':'')+'" data-act="zh" aria-label="切换中文遮挡" aria-pressed="'+zm+'">'+escapeHTML(item.zh)+'</button>'
@@ -169,7 +169,7 @@ function recordingFailed(i,token){
  link.href=dictionarySearch(ITEMS[i].en);
  link.target='_blank';
  link.rel='noopener';
- link.textContent='在剑桥词典查听美式发音';
+ link.textContent='在有道词典查听美式发音';
  audioStatus.replaceChildren('录音加载失败。可以再点一次，或',link,'。');
 }
 function playRecording(i){

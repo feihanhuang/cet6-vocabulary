@@ -13,7 +13,7 @@ import wave
 
 ARTLEX_URL = "https://gitlab.com/chredmon/ku-artlex_eng1.git"
 ARTLEX_COMMIT = "785ab39b274fef3ab2066ca875e5830e8a6fa423"
-DICTIONARY_URL = "https://dictionary.cambridge.org/us/search/english/"
+DICTIONARY_URL = "https://www.youdao.com/result"
 
 
 def read_rows(source):
@@ -90,7 +90,7 @@ def build(source, out, corpus, rows):
     def render(row):
         index, (word, *entry) = row
         if entry[0] is None:
-            return DICTIONARY_URL + "?" + urlencode({"q": entry[1]})
+            return DICTIONARY_URL + "?" + urlencode({"word": entry[1], "lang": "en"})
         files = [corpus / "lexicon" / name for name in entry]
         encode(files, audio / f"{index}.mp3")
         return None
