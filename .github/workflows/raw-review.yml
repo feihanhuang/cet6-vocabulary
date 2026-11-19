@@ -18,11 +18,11 @@ jobs:
           git -C corpus fetch --depth 1 --filter=blob:none origin 785ab39b274fef3ab2066ca875e5830e8a6fa423
           git -C corpus sparse-checkout set --no-cone '/raw_files/*.wav'
           git -C corpus checkout --detach 785ab39b274fef3ab2066ca875e5830e8a6fa423
-      - name: Install FFmpeg
+      - name: Install LAME
         timeout-minutes: 2
         run: |
           sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 update
-          sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 install -y --no-install-recommends ffmpeg
+          sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 install -y --no-install-recommends lame
       - name: Encode compact review copies
         timeout-minutes: 5
         run: |
@@ -30,7 +30,7 @@ jobs:
           find corpus/raw_files -name '*.wav' -print0 | xargs -0 -P 4 -I FILE bash -ec '
             name=$(basename "$1" .wav)
             ls -lh "$1"
-            ffmpeg -nostdin -v error -xerror -threads 1 -i "$1" -ac 1 -ar 16000 -c:a libopus -compression_level 0 -b:a 24k "clips/$name.opus"
+            lame --quiet -m m --resample 16 -b 24 "$1" "clips/$name.mp3"
             ls -lh "clips/$name.opus"
           ' bash FILE
       - uses: actions/upload-artifact@v4
