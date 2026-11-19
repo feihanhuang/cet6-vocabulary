@@ -10,7 +10,7 @@ permissions:
 jobs:
   clips:
     runs-on: ubuntu-24.04
-    timeout-minutes: 8
+    timeout-minutes: 9
     steps:
       - name: Read KU-ArtLex recording blocks
         run: |
@@ -18,15 +18,21 @@ jobs:
           git -C corpus fetch --depth 1 --filter=blob:none origin 785ab39b274fef3ab2066ca875e5830e8a6fa423
           git -C corpus sparse-checkout set --no-cone '/raw_files/*.wav'
           git -C corpus checkout --detach 785ab39b274fef3ab2066ca875e5830e8a6fa423
-      - name: Encode compact review copies
+      - name: Install FFmpeg
+        timeout-minutes: 2
         run: |
           sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 update
           sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 install -y --no-install-recommends ffmpeg
+      - name: Encode compact review copies
+        timeout-minutes: 5
+        run: |
           mkdir clips
-          for file in corpus/raw_files/*.wav; do
-            name=$(basename "$file" .wav)
-            ffmpeg -nostdin -v error -xerror -i "$file" -ac 1 -ar 16000 -c:a libopus -b:a 24k "clips/$name.opus"
-          done
+          find corpus/raw_files -name '*.wav' -print0 | xargs -0 -P 4 -I FILE bash -ec '
+            name=$(basename "$1" .wav)
+            ls -lh "$1"
+            ffmpeg -nostdin -v error -xerror -threads 1 -i "$1" -ac 1 -ar 16000 -c:a libopus -compression_level 0 -b:a 24k "clips/$name.opus"
+            ls -lh "clips/$name.opus"
+          ' bash FILE
       - uses: actions/upload-artifact@v4
         with:
           name: ku-artlex-review
