@@ -31,7 +31,7 @@ jobs:
             name=$(basename "$1" .wav)
             ls -lh "$1"
             lame --quiet -m m --resample 16 -b 24 "$1" "clips/$name.mp3"
-            ls -lh "clips/$name.opus"
+            ls -lh "clips/$name.mp3"
           ' bash FILE
       - uses: actions/upload-artifact@v4
         with:
