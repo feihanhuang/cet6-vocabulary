@@ -24,16 +24,18 @@ def make_clip(row, output, scratch):
     text = re.sub(r"\(([^)]*)\)", r"\1", word.replace("/", ", "))
     text_file = scratch / f"{index}.txt"
     text_file.write_text(text, encoding="utf-8")
+    wav_file = scratch / f"{index}.wav"
     clip = output / f"{index}.mp3"
     subprocess.run(
-        [
-            "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error",
-            "-f", "lavfi", "-i", f"flite=voice=slt:textfile={text_file}",
-            "-c:a", "libmp3lame", "-b:a", "32k", "-ar", "22050",
-            "-threads", "1", "-y", str(clip),
-        ],
+        ["flite", "-voice", "slt", "-f", str(text_file), "-o", str(wav_file)],
         check=True,
     )
+    subprocess.run(
+        ["lame", "--quiet", "-m", "m", "-b", "32", str(wav_file), str(clip)],
+        check=True,
+    )
+    text_file.unlink()
+    wav_file.unlink()
     if clip.stat().st_size < 512:
         raise ValueError(f"Empty pronunciation clip for row {index}: {word}")
 
@@ -44,8 +46,8 @@ def main():
     parser.add_argument("output", type=Path)
     parser.add_argument("--workers", type=int, default=4)
     args = parser.parse_args()
-    if not shutil.which("ffmpeg"):
-        parser.error("FFmpeg with Flite and LAME support is required")
+    if not shutil.which("flite") or not shutil.which("lame"):
+        parser.error("Flite and LAME are required")
 
     words = read_words(args.html)
     args.output.mkdir(parents=True, exist_ok=True)
