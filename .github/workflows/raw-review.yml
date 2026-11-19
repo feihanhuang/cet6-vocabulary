@@ -1,0 +1,34 @@
+name: Prepare pronunciation review clips
+on:
+  push:
+    branches: [cet6-native-pronunciation]
+    paths: [.github/workflows/raw-review.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  clips:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Read KU-ArtLex recording blocks
+        run: |
+          git clone --depth 1 --filter=blob:none --no-checkout https://gitlab.com/chredmon/ku-artlex_eng1.git corpus
+          git -C corpus fetch --depth 1 --filter=blob:none origin 785ab39b274fef3ab2066ca875e5830e8a6fa423
+          git -C corpus sparse-checkout set --no-cone '/raw_files/*.wav'
+          git -C corpus checkout --detach 785ab39b274fef3ab2066ca875e5830e8a6fa423
+      - name: Encode compact review copies
+        run: |
+          sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 update
+          sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 install -y --no-install-recommends ffmpeg
+          mkdir clips
+          for file in corpus/raw_files/*.wav; do
+            name=$(basename "$file" .wav)
+            ffmpeg -nostdin -v error -xerror -i "$file" -ac 1 -ar 16000 -c:a libopus -b:a 24k "clips/$name.opus"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ku-artlex-review
+          path: clips
+          retention-days: 1
