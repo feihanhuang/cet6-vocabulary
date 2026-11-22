@@ -45,6 +45,10 @@
   .audio-status{max-width:1100px;margin:0 auto;padding:0 8px 7px;color:#9a3412;font-size:13px}
   .audio-status a,.sources{color:#1d4ed8}
   .sources{font-size:13px;margin-left:auto;white-space:nowrap}
+  .sync-status{max-width:1100px;margin:0 auto;padding:0 8px 7px;color:var(--muted);font-size:13px}
+  .sync-status:empty{display:none}
+  #sync-logout{padding-inline:7px}
+  @media(max-width:395px){.quickbar-inner{flex-wrap:wrap}.sources{font-size:12px}}
   .audio-status:empty{display:none}
   .global-btn[aria-pressed="true"]{border-color:#bfdbfe;background:#eaf2ff;color:#1d4ed8}
   /* Global visibility is a visual overlay, not a write to each word's mask. */
@@ -61,8 +65,11 @@
  <div class="quickbar-inner">
   <button type="button" class="global-btn" id="toggle-all-en" aria-pressed="false">隐藏英文</button>
   <button type="button" class="global-btn" id="toggle-all-zh" aria-pressed="false">隐藏中文</button>
+  <button type="button" class="global-btn" id="sync-button" hidden disabled>登录同步</button>
+  <button type="button" class="global-btn" id="sync-logout" hidden>退出</button>
   <a class="sources" href="./pronunciation-sources.html">发音来源</a>
  </div>
+ <p class="sync-status" id="sync-status" role="status"></p>
  <p class="audio-status" id="audio-status" role="status"></p>
 </header>
 <main class="wrap"><div id="sheet" class="sheet"></div></main>
@@ -96,8 +103,13 @@ for(const lang of ['en','zh']){
  });
 }
 refreshGlobalMasks();
-const store={};
-try{Object.assign(store,JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}'))}catch(_e){}
+function progressKey(uid){return uid ? STORAGE_KEY+':'+uid : STORAGE_KEY}
+function readProgress(uid){
+ try{return JSON.parse(localStorage.getItem(progressKey(uid))||'{}')||{}}
+ catch{return {}}
+}
+let progressUid=null;
+let store=readProgress(progressUid);
 let loopIndex=-1;
 let activeIndex=-1;
 let playState='stopped';
@@ -138,7 +150,38 @@ sheet.innerHTML=ITEMS.map((item,i)=>{
   +'<div class="counter"><button class="icon-btn" data-act="minus" title="减少" aria-label="减少忘记次数">'+svg('minus')+'</button><span class="count'+(n?' nonzero':'')+'">'+n+'</span><button class="icon-btn" data-act="plus" title="增加" aria-label="增加忘记次数">'+svg('plus')+'</button></div>'
   +'</section>';
 }).join('');
-function save(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(store))}catch(_e){}}
+function save(){try{localStorage.setItem(progressKey(progressUid),JSON.stringify(store))}catch(_e){}}
+function paintProgress(i){
+ const row=sheet.children[i];
+ if(!row)return;
+ const value=store[i]||{};
+ for(const [selector,flag] of [['.en','em'],['.zh','zm']]){
+  const button=row.querySelector(selector);
+  const hidden=value[flag]===true;
+  button.classList.toggle('masked',hidden);
+  button.setAttribute('aria-pressed',String(hidden));
+ }
+ const count=Math.max(0,Number(value.n)||0);
+ const element=row.querySelector('.count');
+ element.textContent=count;
+ element.classList.toggle('nonzero',count>0);
+}
+window.cet6Progress={
+ words:ITEMS.map(item=>item.en),
+ read:uid=>uid===progressUid?store:readProgress(uid),
+ show(uid,patch){
+  if(uid!==progressUid){
+   const before=Object.keys(store);
+   progressUid=uid;
+   store=readProgress(uid);
+   if(patch)Object.assign(store,patch);
+   for(const i of new Set([...before,...Object.keys(store)]))paintProgress(i);
+  }else if(patch){
+   for(const [i,value] of Object.entries(patch)){store[i]=value;paintProgress(i)}
+  }
+  if(patch)save();
+ }
+};
 function entry(i){return store[i]||(store[i]={n:0,em:false,zm:false})}
 function refresh(){
  const affected = new Set([renderedActiveIndex,renderedLoopIndex,activeIndex,loopIndex]);
@@ -221,14 +264,21 @@ sheet.addEventListener('click',e=>{
  const i=Number(row.dataset.i),action=btn.dataset.act;
  if(action==='play'){togglePlay(i);return}
  if(action==='loop'){if(!btn.disabled)toggleLoop(i);return}
- const d=entry(i);
+ const value=entry(i);
  if(action==='en'||action==='zh'){
-  const key=action==='en'?'em':'zm';d[key]=!d[key];btn.classList.toggle('masked',d[key]);btn.setAttribute('aria-pressed',String(d[key]));save();return;
+  const field=action==='en'?'em':'zm';
+  value[field]=!value[field];
+  window.cet6Progress.record?.(i,field,value[field]);
+ }else{
+  const delta=action==='plus'?1:-1;
+  value.n=Math.min(1_000_000,Math.max(0,(Number(value.n)||0)+delta));
+  window.cet6Progress.record?.(i,'n',delta);
  }
- d.n=Math.max(0,(Number(d.n)||0)+(action==='plus'?1:-1));
- const el=row.querySelector('.count');el.textContent=d.n;el.classList.toggle('nonzero',d.n>0);save();
+ paintProgress(i);
+ save();
 });
 window.addEventListener('pagehide',()=>{loopIndex=-1;stop()});
 </script>
+<script type="module" src="./progress-sync.js"></script>
 </body>
 </html>

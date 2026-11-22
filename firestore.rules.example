@@ -1,0 +1,31 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function ownsProgress(userId) {
+      return request.auth != null
+        && request.auth.uid == userId
+        && request.auth.token.email_verified == true
+        && request.auth.token.email == 'OWNER_EMAIL';
+    }
+    match /vocabProgress/{userId}/words/{wordId} {
+      allow read: if ownsProgress(userId);
+      allow create, update: if ownsProgress(userId)
+        && request.resource.data.keys().hasOnly(['word', 'em', 'zm', 'n', 'rev'])
+        && request.resource.data.word is string
+        && request.resource.data.word.size() <= 160
+        && request.resource.data.get('em', false) is bool
+        && request.resource.data.get('zm', false) is bool
+        && request.resource.data.get('n', 0) is int
+        && request.resource.data.get('n', 0) >= 0
+        && request.resource.data.get('n', 0) <= 1000000
+        && request.resource.data.rev is int
+        && request.resource.data.rev > 0;
+    }
+    match /vocabProgress/{userId}/receipts/{operationId} {
+      allow get: if ownsProgress(userId);
+      allow create: if ownsProgress(userId)
+        && request.resource.data.keys().hasOnly(['applied'])
+        && request.resource.data.applied == true;
+    }
+  }
+}
