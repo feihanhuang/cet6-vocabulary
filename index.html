@@ -19,13 +19,9 @@
   .tools{justify-content:flex-start}
   .icon-btn{display:inline-flex;align-items:center;justify-content:center;width:35px;height:35px;border:1px solid #dde5ef;border-radius:9px;background:#fff;color:#51627b;cursor:pointer;padding:0;flex:none;transition:background .12s,border-color .12s,color .12s}
   .icon-btn{text-decoration:none}
-  .icon-btn:disabled{opacity:.35;cursor:default}
   .icon-btn:hover{background:#eff4ff;border-color:#c7d8f8;color:#1d4ed8}
   .icon-btn:focus-visible,.word:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
   .icon-btn svg{width:18px;height:18px;stroke:currentColor;stroke-width:1.85;fill:none;stroke-linecap:round;stroke-linejoin:round}
-  .icon-btn.playing{color:var(--blue);border-color:#b8d0ff;background:var(--blue-bg)}
-  .icon-btn.loop-on{background:#2563eb;border-color:#2563eb;color:white}
-  .icon-btn.loop-on:hover{background:#1d4ed8}
   .word{font-size:16px;line-height:1.45;min-height:25px;display:inline-flex;align-items:center;width:fit-content;max-width:100%;padding:3px 5px;border:0;border-radius:6px;background:transparent;cursor:pointer;text-align:left;font-family:inherit;white-space:normal;word-break:break-word}
   .en{font-weight:650;letter-spacing:.015em}
   .zh{font-size:15px;color:#475569}
@@ -42,14 +38,12 @@
   .global-btn{border:1px solid #dbe3ed;border-radius:9px;padding:7px 13px;background:#fff;color:#334155;font:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;min-height:36px}
   .global-btn:hover{background:#eff4ff;border-color:#c7d8f8}
   .global-btn:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
-  .audio-status{max-width:1100px;margin:0 auto;padding:0 8px 7px;color:#9a3412;font-size:13px}
-  .audio-status a,.sources{color:#1d4ed8}
+  .sources{color:#1d4ed8}
   .sources{font-size:13px;margin-left:auto;white-space:nowrap}
   .sync-status{max-width:1100px;margin:0 auto;padding:0 8px 7px;color:var(--muted);font-size:13px}
   .sync-status:empty{display:none}
   #sync-logout{padding-inline:7px}
   @media(max-width:395px){.quickbar-inner{flex-wrap:wrap}.sources{font-size:12px}}
-  .audio-status:empty{display:none}
   .global-btn[aria-pressed="true"]{border-color:#bfdbfe;background:#eaf2ff;color:#1d4ed8}
   /* Global visibility is a visual overlay, not a write to each word's mask. */
   body.hide-all-en .word.en,body.hide-all-zh .word.zh{color:transparent!important;background:var(--mask);user-select:none;-webkit-user-select:none}
@@ -70,7 +64,6 @@
   <a class="sources" href="./pronunciation-sources.html">发音来源</a>
  </div>
  <p class="sync-status" id="sync-status" role="status"></p>
- <p class="audio-status" id="audio-status" role="status"></p>
 </header>
 <main class="wrap"><div id="sheet" class="sheet"></div></main>
 <script src="./pronunciations.js"></script>
@@ -110,20 +103,10 @@ function readProgress(uid){
 }
 let progressUid=null;
 let store=readProgress(progressUid);
-let loopIndex=-1;
-let activeIndex=-1;
-let playState='stopped';
-let ticket=0;
-let renderedActiveIndex=-1,renderedLoopIndex=-1;
 const dictionaryLinks=typeof DICTIONARY_LINKS==='undefined'?[]:DICTIONARY_LINKS;
 const dictionarySearch=(word)=>'https://www.youdao.com/result?word='+encodeURIComponent(word)+'&lang=en';
-const audioStatus=document.getElementById('audio-status');
-let recording=null;
 const icons={
-  play:'<polygon points="7 4 20 12 7 20 7 4"/>',
-  pause:'<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
   external:'<path d="M13 4h7v7m0-7-9 9m7 0v6H5V6h6"/>',
-  loop:'<path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 013-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 01-3 3H3"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
   minus:'<path d="M5 12h14"/>'
 };
@@ -135,16 +118,10 @@ sheet.innerHTML=ITEMS.map((item,i)=>{
  const n=Math.max(0,Number(saved.n)||0);
  const em=!!saved.em,zm=!!saved.zm;
  const label=escapeHTML(item.en);
- const reference=i in dictionaryLinks?dictionaryLinks[i]:dictionarySearch(item.en);
- const playable=reference===null;
- const play=playable
-  ? '<button class="icon-btn audio" data-act="play" aria-label="播放 '+label+' 的美式发音" aria-pressed="false" title="美式发音（真人录音）">'+svg('play')+'</button>'
-  : '<a class="icon-btn" href="'+escapeHTML(reference)+'" target="_blank" rel="noopener" aria-label="在有道词典查听 '+label+' 的美式发音" title="在有道词典查听美式发音">'+svg('external')+'</a>';
+ const reference=dictionaryLinks[i]||dictionarySearch(item.en);
+ const pronunciation='<a class="icon-btn" href="'+escapeHTML(reference)+'" target="_blank" rel="noopener" aria-label="在有道词典查听 '+label+' 的美式发音" title="在有道词典查听美式发音">'+svg('external')+'</a>';
  return '<section class="line" data-i="'+i+'">'
-  +'<div class="tools">'+play
-  +'<button class="icon-btn repeat" data-act="loop" aria-label="循环 '+label+'" aria-pressed="false"'
-  +(playable?' title="循环播放"':' disabled title="有道词典词条请在词典内播放"')+'>'+svg('loop')+'</button>'
-  +'</div>'
+  +'<div class="tools">'+pronunciation+'</div>'
   +'<button class="word en'+(em?' masked':'')+'" data-act="en" aria-label="切换英文遮挡" aria-pressed="'+em+'">'+escapeHTML(item.en)+'</button>'
   +'<button class="word zh'+(zm?' masked':'')+'" data-act="zh" aria-label="切换中文遮挡" aria-pressed="'+zm+'">'+escapeHTML(item.zh)+'</button>'
   +'<div class="counter"><button class="icon-btn" data-act="minus" title="减少" aria-label="减少忘记次数">'+svg('minus')+'</button><span class="count'+(n?' nonzero':'')+'">'+n+'</span><button class="icon-btn" data-act="plus" title="增加" aria-label="增加忘记次数">'+svg('plus')+'</button></div>'
@@ -183,87 +160,10 @@ window.cet6Progress={
  }
 };
 function entry(i){return store[i]||(store[i]={n:0,em:false,zm:false})}
-function refresh(){
- const affected = new Set([renderedActiveIndex,renderedLoopIndex,activeIndex,loopIndex]);
- for(const i of affected){
-  if(i<0||i>=ITEMS.length)continue;
-  const row=sheet.children[i];if(!row)continue;
-  const play=row.querySelector('.audio');if(!play)continue;
-  const playing=(i===activeIndex&&playState==='playing');
-  play.classList.toggle('playing',playing);
-  play.innerHTML=svg(playing?'pause':'play');
-  play.setAttribute('aria-pressed',playing?'true':'false');
-  play.setAttribute('aria-label',(playing?'暂停 ':'播放 ')+ITEMS[i].en+' 的美式发音');
-  const repeat=row.querySelector('.repeat');repeat.classList.toggle('loop-on',loopIndex===i);
-  repeat.setAttribute('aria-pressed',loopIndex===i?'true':'false');
- }
- renderedActiveIndex=activeIndex;renderedLoopIndex=loopIndex;
-}
-function stop(){
- ticket++;
- if(recording)recording.pause();
- activeIndex=-1;playState='stopped';refresh();
-}
-function recordingFailed(i,token){
- if(token!==ticket||i!==activeIndex)return;
- if(loopIndex===i)loopIndex=-1;
- stop();
- const link=document.createElement('a');
- link.href=dictionarySearch(ITEMS[i].en);
- link.target='_blank';
- link.rel='noopener';
- link.textContent='在有道词典查听美式发音';
- audioStatus.replaceChildren('录音加载失败。可以再点一次，或',link,'。');
-}
-function playRecording(i){
- if(!recording){
-  recording=new Audio();
-  recording.preload='none';
-  recording.addEventListener('ended',()=>{
-   if(recording.ended&&playState==='playing')stop();
-  });
- }
- const switching=activeIndex!==i;
- const token=++ticket;
- activeIndex=i;playState='playing';
- audioStatus.textContent='';
- recording.loop=loopIndex===i;
- if(switching)recording.src='./us-audio/'+i+'.mp3';
- recording.onerror=()=>{
-  if(recording.error)recordingFailed(i,token);
- };
- refresh();
- // Keep play() in the tap handler so Safari can grant media playback.
- recording.play().catch(()=>recordingFailed(i,token));
-}
-function togglePlay(i){
- if(i===activeIndex){
-  if(playState==='playing'){
-   ticket++;recording.pause();
-   playState='paused';refresh();return;
-  }
- }
- if(loopIndex!==i)loopIndex=-1;
- playRecording(i);
-}
-function toggleLoop(i){
- if(loopIndex===i){
-  loopIndex=-1;
-  if(recording)recording.loop=false;
-  refresh();return;
- }
- loopIndex=i;
- if(activeIndex!==i||playState!=='playing'){playRecording(i);return}
- if(recording)recording.loop=true;
- refresh();
-}
 sheet.addEventListener('click',e=>{
- if(e.target.closest('.tools a')){loopIndex=-1;stop();audioStatus.textContent='';return}
  const btn=e.target.closest('button[data-act]');if(!btn)return;
  const row=btn.closest('.line');if(!row)return;
  const i=Number(row.dataset.i),action=btn.dataset.act;
- if(action==='play'){togglePlay(i);return}
- if(action==='loop'){if(!btn.disabled)toggleLoop(i);return}
  const value=entry(i);
  if(action==='en'||action==='zh'){
   const field=action==='en'?'em':'zm';
@@ -277,7 +177,6 @@ sheet.addEventListener('click',e=>{
  paintProgress(i);
  save();
 });
-window.addEventListener('pagehide',()=>{loopIndex=-1;stop()});
 </script>
 <script type="module" src="./progress-sync.js"></script>
 </body>
